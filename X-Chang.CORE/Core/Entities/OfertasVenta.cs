@@ -33,8 +33,6 @@ public partial class OfertasVenta
 
     public virtual ICollection<CancelacionesOrdenOferta> CancelacionesOrdenOferta { get; set; } = new List<CancelacionesOrdenOferta>();
 
-    public virtual ICollection<EjecucionesOrden> EjecucionesOrden { get; set; } = new List<EjecucionesOrden>();
-
     public virtual ParesMoneda ParMoneda { get; set; } = null!;
 
     public virtual Usuarios Usuario { get; set; } = null!;

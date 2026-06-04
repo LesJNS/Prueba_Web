@@ -20,24 +20,6 @@ public class OfertasController : ControllerBase
 
     private int UsuarioId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    [HttpPost]
-    public async Task<IActionResult> CrearOferta([FromBody] CrearOfertaRequest request)
-    {
-        try
-        {
-            var result = await _ofertaService.CrearOfertaVentaAsync(UsuarioId, request);
-            return CreatedAtAction(nameof(ObtenerOferta), new { id = result.OfertaVentaId }, result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
     [HttpGet]
     public async Task<IActionResult> ObtenerMisOfertas([FromQuery] FiltroOfertasRequest filtro)
     {

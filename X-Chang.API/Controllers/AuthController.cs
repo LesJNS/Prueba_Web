@@ -67,36 +67,4 @@ public class AuthController : ControllerBase
             return Unauthorized(new { error = ex.Message });
         }
     }
-
-    [Authorize]
-    [HttpPut("cambiar-password")]
-    public async Task<IActionResult> CambiarPassword([FromBody] CambiarPasswordRequest request)
-    {
-        var usuarioId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        try
-        {
-            await _authService.CambiarPasswordAsync(usuarioId, request);
-            return NoContent();
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { error = ex.Message });
-        }
-    }
-
-    [Authorize]
-    [HttpPut("tema")]
-    public async Task<IActionResult> CambiarTema([FromBody] CambiarTemaRequest request)
-    {
-        var usuarioId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        try
-        {
-            await _authService.CambiarTemaAsync(usuarioId, request.TemaVisual);
-            return NoContent();
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
 }

@@ -20,24 +20,6 @@ public class OrdenesController : ControllerBase
 
     private int UsuarioId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    [HttpPost]
-    public async Task<IActionResult> CrearOrden([FromBody] CrearOrdenRequest request)
-    {
-        try
-        {
-            var result = await _ordenService.CrearOrdenCompraAsync(UsuarioId, request);
-            return CreatedAtAction(nameof(ObtenerOrden), new { id = result.OrdenCompraId }, result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
     [HttpGet]
     public async Task<IActionResult> ObtenerMisOrdenes([FromQuery] FiltroOrdenesRequest filtro)
     {
@@ -71,19 +53,5 @@ public class OrdenesController : ControllerBase
         {
             return BadRequest(new { error = ex.Message });
         }
-    }
-
-    [HttpGet("libro/{parMonedaId:int}")]
-    public async Task<IActionResult> ObtenerLibroOrdenes(int parMonedaId)
-    {
-        var result = await _ordenService.ObtenerLibroOrdenesAsync(parMonedaId);
-        return Ok(result);
-    }
-
-    [HttpGet("libro/{parMonedaId:int}/detalle")]
-    public async Task<IActionResult> ObtenerLibroOrdenesDetalle(int parMonedaId, [FromQuery] int limite = 10)
-    {
-        var result = await _ordenService.ObtenerLibroOrdenesDetalleAsync(parMonedaId, limite);
-        return Ok(result);
     }
 }

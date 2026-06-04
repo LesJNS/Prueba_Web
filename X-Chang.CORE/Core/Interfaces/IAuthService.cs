@@ -8,6 +8,4 @@ public interface IAuthService
     Task<AuthResponse> LoginAsync(LoginRequest request);
     Task LogoutAsync(int usuarioId, string refreshToken);
     Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request);
-    Task CambiarPasswordAsync(int usuarioId, CambiarPasswordRequest request);
-    Task CambiarTemaAsync(int usuarioId, string temaVisual);
 }

@@ -22,15 +22,8 @@ public static class ServiceCollectionExtensions
         services.Configure<SessionSettings>(configuration.GetSection("SessionSettings"));
 
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IBilleteraService, BilleteraService>();
-        services.AddScoped<IMatchingService, MatchingService>();
         services.AddScoped<IOrdenService, OrdenService>();
         services.AddScoped<IOfertaService, OfertaService>();
-        services.AddScoped<IOperacionInmediataService, OperacionInmediataService>();
-        services.AddScoped<IRutaConversionService, RutaConversionService>();
-        services.AddScoped<IHistorialService, HistorialService>();
-        services.AddScoped<IAdminService, AdminService>();
-        services.AddScoped<IParesMonedasService, ParesMonedasService>();
 
         return services;
     }

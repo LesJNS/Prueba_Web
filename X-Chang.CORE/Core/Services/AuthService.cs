@@ -143,30 +143,6 @@ public class AuthService : IAuthService
         return await GenerarAuthResponseAsync(sesion.Usuario, sesion.Usuario.Rol.Nombre);
     }
 
-    public async Task CambiarPasswordAsync(int usuarioId, CambiarPasswordRequest request)
-    {
-        var usuario = await _context.Usuarios.FindAsync(usuarioId)
-            ?? throw new InvalidOperationException("Usuario no encontrado.");
-
-        if (!BCrypt.Net.BCrypt.Verify(request.PasswordActual, usuario.PasswordHash))
-            throw new UnauthorizedAccessException("La contraseña actual es incorrecta.");
-
-        usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.PasswordNuevo);
-        await _context.SaveChangesAsync();
-    }
-
-    public async Task CambiarTemaAsync(int usuarioId, string temaVisual)
-    {
-        if (temaVisual != "Claro" && temaVisual != "Oscuro")
-            throw new ArgumentException("El tema debe ser 'Claro' u 'Oscuro'.");
-
-        var usuario = await _context.Usuarios.FindAsync(usuarioId)
-            ?? throw new InvalidOperationException("Usuario no encontrado.");
-
-        usuario.TemaVisual = temaVisual;
-        await _context.SaveChangesAsync();
-    }
-
     private async Task<AuthResponse> GenerarAuthResponseAsync(Usuarios usuario, string rolNombre)
     {
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
