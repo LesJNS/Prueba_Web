@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using X_Chang.API.Models;
 using X_Chang.CORE.Interfaces;
+using X_Chang.CORE.Repositories;
 using X_Chang.CORE.Services;
 using X_Chang.CORE.Settings;
 
@@ -31,6 +32,17 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IHistorialService, HistorialService>();
         services.AddScoped<IAdminService, AdminService>();
         services.AddScoped<IParesMonedasService, ParesMonedasService>();
+
+        services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IBilleteraRepository, BilleteraRepository>();
+        services.AddScoped<IOrdenRepository, OrdenRepository>();
+        services.AddScoped<IOfertaRepository, OfertaRepository>();
+        services.AddScoped<IParMonedaRepository, ParMonedaRepository>();
+        services.AddScoped<ISesionRepository, SesionRepository>();
+        services.AddScoped<IOperacionRepository, OperacionRepository>();
+        services.AddScoped<IRutaRepository, RutaRepository>();
+        services.AddScoped<IHistorialRepository, HistorialRepository>();
+        services.AddScoped<IAdminRepository, AdminRepository>();
 
         return services;
     }
