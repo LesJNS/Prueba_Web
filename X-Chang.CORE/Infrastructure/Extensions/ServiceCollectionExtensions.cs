@@ -19,9 +19,8 @@ public static class ServiceCollectionExtensions
                 configuration.GetConnectionString("DefaultConnection"),
                 sql => sql.EnableRetryOnFailure(3)));
 
-        services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
+        services.Configure<SessionSettings>(configuration.GetSection("SessionSettings"));
 
-        services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IBilleteraService, BilleteraService>();
         services.AddScoped<IMatchingService, MatchingService>();

@@ -50,7 +50,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request)
     {
         var usuarioId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await _authService.LogoutAsync(usuarioId, request.RefreshToken);
+        await _authService.LogoutAsync(usuarioId, request.Token);
         return NoContent();
     }
 

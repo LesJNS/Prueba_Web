@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using X_Chang.API.Models;
@@ -11,17 +11,14 @@ namespace X_Chang.CORE.Services;
 public class AuthService : IAuthService
 {
     private readonly ExchangeDivisasDbContext _context;
-    private readonly IJwtService _jwtService;
-    private readonly JwtSettings _jwtSettings;
+    private readonly SessionSettings _sessionSettings;
 
     public AuthService(
         ExchangeDivisasDbContext context,
-        IJwtService jwtService,
-        IOptions<JwtSettings> jwtSettings)
+        IOptions<SessionSettings> sessionSettings)
     {
         _context = context;
-        _jwtService = jwtService;
-        _jwtSettings = jwtSettings.Value;
+        _sessionSettings = sessionSettings.Value;
     }
 
     public async Task<AuthResponse> RegistrarAsync(RegisterRequest request)
@@ -128,7 +125,7 @@ public class AuthService : IAuthService
             .Include(s => s.Usuario)
             .ThenInclude(u => u.Rol)
             .FirstOrDefaultAsync(s =>
-                s.TokenSesion == request.RefreshToken &&
+                s.TokenSesion == request.Token &&
                 s.Estado == "Activa");
 
         if (sesion == null || sesion.FechaExpiracion < DateTime.UtcNow)
@@ -158,18 +155,8 @@ public class AuthService : IAuthService
 
     private async Task<AuthResponse> GenerarAuthResponseAsync(Usuarios usuario, string rolNombre)
     {
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, usuario.UsuarioId.ToString()),
-            new Claim(ClaimTypes.Name, usuario.NombreUsuario),
-            new Claim(ClaimTypes.Email, usuario.CorreoElectronico),
-            new Claim(ClaimTypes.Role, rolNombre)
-        };
-
-        var token = _jwtService.GenerarToken(claims);
-        var refreshToken = _jwtService.GenerarRefreshToken();
-        var expira = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiresInMinutes);
-        var refreshExpira = DateTime.UtcNow.AddDays(_jwtSettings.RefreshExpiresInDays);
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        var expira = DateTime.UtcNow.AddDays(_sessionSettings.ExpiresInDays);
 
         var sesionesActivas = await _context.SesionesUsuario
             .Where(s => s.UsuarioId == usuario.UsuarioId && s.Estado == "Activa")
@@ -184,16 +171,16 @@ public class AuthService : IAuthService
         _context.SesionesUsuario.Add(new SesionesUsuario
         {
             UsuarioId = usuario.UsuarioId,
-            TokenSesion = refreshToken,
+            TokenSesion = token,
             FechaInicio = DateTime.UtcNow,
-            FechaExpiracion = refreshExpira,
+            FechaExpiracion = expira,
             Estado = "Activa"
         });
 
         await _context.SaveChangesAsync();
 
         return new AuthResponse(
-            token, refreshToken, expira,
+            token, expira,
             new UsuarioInfoDto(
                 usuario.UsuarioId,
                 usuario.NombreUsuario,
