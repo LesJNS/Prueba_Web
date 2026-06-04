@@ -275,6 +275,20 @@ public class BilleteraService : IBilleteraService
             .ToListAsync();
     }
 
+    public async Task<List<MetodoPagoDto>> ObtenerMetodosPagoAsync(int usuarioId)
+    {
+        var usuario = await _context.Usuarios.FindAsync(usuarioId)
+            ?? throw new InvalidOperationException("Usuario no encontrado.");
+
+        return await _context.MetodosPagoPais
+            .Include(mp => mp.MetodoPago)
+            .Where(mp => mp.PaisId == usuario.PaisId && mp.Activo && mp.MetodoPago.Activo)
+            .Select(mp => new MetodoPagoDto(
+                mp.MetodoPagoId, mp.MetodoPago.Nombre, mp.MetodoPago.Tipo,
+                mp.MetodoPago.ComisionPorcentaje, mp.MetodoPago.ComisionFija))
+            .ToListAsync();
+    }
+
     internal static async Task<SaldosBilletera> ObtenerOCrearSaldoInternoAsync(
         ExchangeDivisasDbContext context, int billeteraId, int monedaId)
     {

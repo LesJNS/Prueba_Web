@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using X_Chang.CORE.DTOs;
 using X_Chang.CORE.Interfaces;
 
 namespace X_Chang.API.Controllers.Admin;
@@ -17,9 +18,9 @@ public class AdminDashboardController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> ObtenerDashboard()
+    public async Task<IActionResult> ObtenerDashboard([FromQuery] FiltroDashboardRequest filtro)
     {
-        var result = await _adminService.ObtenerDashboardAsync();
+        var result = await _adminService.ObtenerDashboardAsync(filtro);
         return Ok(result);
     }
 }

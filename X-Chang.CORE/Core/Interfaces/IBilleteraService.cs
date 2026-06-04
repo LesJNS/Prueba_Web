@@ -10,4 +10,5 @@ public interface IBilleteraService
     Task<PagedResult<MovimientoDto>> ObtenerMovimientosAsync(int usuarioId, int pagina, int tamano);
     Task<List<DepositoDto>> ObtenerDepositosAsync(int usuarioId);
     Task<List<RetiroDto>> ObtenerRetirosAsync(int usuarioId);
+    Task<List<MetodoPagoDto>> ObtenerMetodosPagoAsync(int usuarioId);
 }

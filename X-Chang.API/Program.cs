@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Scalar.AspNetCore;
 using X_Chang.API.Authentication;
 using X_Chang.CORE.Infrastructure.Extensions;
 
@@ -34,6 +35,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseExceptionHandler(errorApp =>

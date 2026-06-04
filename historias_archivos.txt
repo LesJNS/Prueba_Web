@@ -1,0 +1,629 @@
+MAPA DE HISTORIAS DE USUARIO - ARCHIVOS Y CARPETAS
+Proyecto: X-Chang (Exchange de Divisas con Billetera Virtual)
+====================================================================
+
+US-001 - Registro de usuario
+--------------------------------------------------------------------
+Responsable: Angel Aguilar Contreras
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\AuthDTOs.cs
+    - RegisterRequest (validaciones: StringLength, EmailAddress, RegularExpression, ConfirmarPassword)
+
+  X-Chang.CORE\Core\Interfaces\IAuthService.cs
+    - RegistrarAsync(RegisterRequest)
+
+  X-Chang.CORE\Core\Services\AuthService.cs
+    - RegistrarAsync: valida correo unico, username unico, pais, crea usuario + billetera
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\AuthController.cs
+    - POST /api/auth/register
+
+
+US-002 - Inicio de sesion
+--------------------------------------------------------------------
+Responsable: Angel Aguilar Contreras
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\AuthDTOs.cs
+    - LoginRequest (campo IdentificadorAcceso acepta username o correo)
+
+  X-Chang.CORE\Core\Services\AuthService.cs
+    - LoginAsync: busca usuario por CorreoElectronico O NombreUsuario
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\AuthController.cs
+    - POST /api/auth/login
+    - POST /api/auth/refresh
+    - POST /api/auth/logout
+
+
+US-003 - Navegacion principal
+--------------------------------------------------------------------
+Responsable: Angel Aguilar Contreras
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\AuthDTOs.cs
+    - UsuarioInfoDto (contiene Rol para mostrar opciones segun rol)
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\AuthController.cs
+    - POST /api/auth/login (devuelve rol del usuario para la navegacion)
+    - POST /api/auth/logout
+
+Nota: La navegacion lateral es implementacion de frontend (Vue.js).
+      El backend provee el rol del usuario en AuthResponse.
+
+
+US-004 - Visualizacion de ordenes y ofertas activas
+--------------------------------------------------------------------
+Responsable: Angel Aguilar Contreras
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\OrdenDTOs.cs
+    - FiltroOrdenesRequest (Desde, Hasta, Estado, Pagina, TamanoPagina)
+    - OrdenDto (FechaCreacion, Par, PrecioUnitario, CantidadOriginal, CantidadPendiente, TotalComprometido, TotalEjecutado, Estado)
+
+  X-Chang.CORE\Core\DTOs\OfertaDTOs.cs
+    - FiltroOfertasRequest (Desde, Hasta, Estado, Pagina, TamanoPagina)
+    - OfertaDto (mismos campos equivalentes)
+
+  X-Chang.CORE\Core\Interfaces\IOrdenService.cs
+    - ObtenerMisOrdenesAsync(usuarioId, FiltroOrdenesRequest) -> PagedResult<OrdenDto>
+
+  X-Chang.CORE\Core\Interfaces\IOfertaService.cs
+    - ObtenerMisOfertasAsync(usuarioId, FiltroOfertasRequest) -> PagedResult<OfertaDto>
+
+  X-Chang.CORE\Core\Services\OrdenService.cs
+    - ObtenerMisOrdenesAsync: filtra por fecha, estado, pagina
+
+  X-Chang.CORE\Core\Services\OfertaService.cs
+    - ObtenerMisOfertasAsync: filtra por fecha, estado, pagina
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\OrdenesController.cs
+    - GET /api/ordenes?Desde=&Hasta=&Estado=&Pagina=&TamanoPagina=
+
+  X-Chang.API\Controllers\OfertasController.cs
+    - GET /api/ofertas?Desde=&Hasta=&Estado=&Pagina=&TamanoPagina=
+
+
+US-005 - Configuracion de tema visual
+--------------------------------------------------------------------
+Responsable: Domenico Chang
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\AuthDTOs.cs
+    - CambiarTemaRequest (campo TemaVisual: "Claro" u "Oscuro")
+    - UsuarioInfoDto (incluye TemaVisual en la respuesta de login)
+
+  X-Chang.CORE\Core\Interfaces\IAuthService.cs
+    - CambiarTemaAsync(usuarioId, temaVisual)
+
+  X-Chang.CORE\Core\Services\AuthService.cs
+    - CambiarTemaAsync: valida valor y actualiza en BD
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\AuthController.cs
+    - PUT /api/auth/tema  [Authorize]
+
+Nota: La aplicacion inmediata del tema en la UI es implementacion de frontend.
+
+
+US-006 - Billetera virtual y barra de monedas
+--------------------------------------------------------------------
+Responsable: Jair Menendez Limaylla
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\BilleteraDTOs.cs
+    - BilleteraDto (lista de SaldoDto)
+    - SaldoDto (CodigoISO, NombreMoneda, TipoMoneda, SaldoDisponible)
+
+  X-Chang.CORE\Core\Interfaces\IBilleteraService.cs
+    - ObtenerBilleteraAsync(usuarioId) -> BilleteraDto
+
+  X-Chang.CORE\Core\Services\BilleteraService.cs
+    - ObtenerBilleteraAsync: incluye todos los saldos del usuario
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\BilleteraController.cs
+    - GET /api/billetera  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\Billeteras.cs
+  X-Chang.CORE\Core\Entities\SaldosBilletera.cs
+  X-Chang.CORE\Core\Entities\Monedas.cs
+
+
+US-007 - Deposito de dinero a la billetera
+--------------------------------------------------------------------
+Responsable: Jair Menendez Limaylla
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\BilleteraDTOs.cs
+    - DepositoRequest (MonedaId, MetodoPagoId, Monto)
+    - DepositoDto (respuesta con comision y total pagado)
+
+  X-Chang.CORE\Core\DTOs\ParesMonedaDTOs.cs
+    - MetodoPagoDto (Nombre, Tipo, ComisionPorcentaje, ComisionFija)
+
+  X-Chang.CORE\Core\Interfaces\IBilleteraService.cs
+    - DepositarAsync(usuarioId, DepositoRequest) -> DepositoDto
+    - ObtenerMetodosPagoAsync(usuarioId) -> List<MetodoPagoDto>
+
+  X-Chang.CORE\Core\Services\BilleteraService.cs
+    - DepositarAsync: calcula comision, actualiza saldo, registra movimiento
+    - ObtenerMetodosPagoAsync: filtra metodos por pais del usuario
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\BilleteraController.cs
+    - POST /api/billetera/depositar  [Authorize]
+    - GET  /api/billetera/metodos-pago  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\Depositos.cs
+  X-Chang.CORE\Core\Entities\MetodosPago.cs
+  X-Chang.CORE\Core\Entities\MetodosPagoPais.cs
+  X-Chang.CORE\Core\Entities\MovimientosBilletera.cs
+
+
+US-008 - Retiro de dinero de la billetera
+--------------------------------------------------------------------
+Responsable: Leslie Neciosup
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\BilleteraDTOs.cs
+    - RetiroRequest (MonedaId, MetodoPagoId, Monto)
+    - RetiroDto (respuesta con comision y monto final recibido)
+
+  X-Chang.CORE\Core\Interfaces\IBilleteraService.cs
+    - RetirarAsync(usuarioId, RetiroRequest) -> RetiroDto
+    - ObtenerMetodosPagoAsync(usuarioId) -> List<MetodoPagoDto>
+
+  X-Chang.CORE\Core\Services\BilleteraService.cs
+    - RetirarAsync: valida saldo, calcula comision, descuenta saldo, registra movimiento
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\BilleteraController.cs
+    - POST /api/billetera/retirar  [Authorize]
+    - GET  /api/billetera/metodos-pago  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\Retiros.cs
+  X-Chang.CORE\Core\Entities\MetodosPago.cs
+  X-Chang.CORE\Core\Entities\MetodosPagoPais.cs
+  X-Chang.CORE\Core\Entities\MovimientosBilletera.cs
+
+
+US-009 - Menu principal con graficos de precios
+--------------------------------------------------------------------
+Responsable: Yoel Miranda
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\ParesMonedaDTOs.cs
+    - GraficoPrincipalDto (PrimerGrafico, SegundoGrafico)
+    - ParMonedasDetalleDto (historico de precios)
+    - HistoricoParDto (FechaRegistro, MayorPrecioCompra, MenorPrecioVenta, Margen)
+    - FiltroHistoricoRequest (RangoTemporal)
+
+  X-Chang.CORE\Core\Interfaces\IParesMonedasService.cs
+    - ObtenerGraficoPrincipalAsync(usuarioId?) -> GraficoPrincipalDto
+
+  X-Chang.CORE\Core\Services\ParesMonedasService.cs
+    - ObtenerGraficoPrincipalAsync: determina moneda del pais del usuario,
+      detecta orden/oferta activa mas reciente para segundo grafico
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\ParesMonedasController.cs
+    - GET /api/pares/grafico-principal
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\HistoricoPreciosPar.cs
+  X-Chang.CORE\Core\Entities\ParesMoneda.cs
+  X-Chang.CORE\Core\Entities\Paises.cs
+
+
+US-010 - Listado de pares de monedas (seccion Monedas)
+--------------------------------------------------------------------
+Responsable: Yoel Miranda
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\ParesMonedaDTOs.cs
+    - ParMonedasDto (Par, MayorPrecioCompra, MenorPrecioVenta, Margen, VolumenTotal)
+    - FiltroParesRequest (MonedaOrigen, MonedaDestino, OrdenarPor, Direccion, ColapsarInversos, Pagina, TamanoPagina)
+
+  X-Chang.CORE\Core\Interfaces\IParesMonedasService.cs
+    - ObtenerParesAsync(FiltroParesRequest, usuarioId?) -> PagedResult<ParMonedasDto>
+
+  X-Chang.CORE\Core\Services\ParesMonedasService.cs
+    - ObtenerParesAsync: filtra, colapsa inversos, ordena por 5 criterios
+      (FechaReciente prioriza pares del historial del usuario), pagina
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\ParesMonedasController.cs
+    - GET /api/pares?MonedaOrigen=&MonedaDestino=&OrdenarPor=&Direccion=&ColapsarInversos=&Pagina=&TamanoPagina=
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\ParesMoneda.cs
+  X-Chang.CORE\Core\Entities\HistoricoPreciosPar.cs
+  X-Chang.CORE\Core\Entities\Monedas.cs
+
+
+US-011 - Visualizacion de detalle de par de monedas
+--------------------------------------------------------------------
+Responsable: Yoel Miranda
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\ParesMonedaDTOs.cs
+    - ParMonedasDetalleDto (Par, MayorPrecioCompra, MenorPrecioVenta, Margen, lista Historico)
+    - HistoricoParDto (FechaRegistro, MayorPrecioCompra, MenorPrecioVenta, Margen, VolumenCompra, VolumenVenta)
+    - FiltroHistoricoRequest (RangoTemporal: UltimoDia | UltimaSemana | UltimoMes | UltimoAnio | Total)
+
+  X-Chang.CORE\Core\Interfaces\IParesMonedasService.cs
+    - ObtenerParDetalleAsync(parMonedaId, FiltroHistoricoRequest) -> ParMonedasDetalleDto
+
+  X-Chang.CORE\Core\Services\ParesMonedasService.cs
+    - ObtenerParDetalleAsync: carga historico filtrado por rango temporal
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\ParesMonedasController.cs
+    - GET /api/pares/{id}?RangoTemporal=UltimoDia
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\HistoricoPreciosPar.cs
+  X-Chang.CORE\Core\Entities\ParesMoneda.cs
+
+
+US-012 - Visualizacion de libro de ordenes
+--------------------------------------------------------------------
+Responsable: Mattias Caballero Salazar
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\OrdenDTOs.cs
+    - LibroOrdenesDto (Compras: List<NivelOrdenDto>, Ventas: List<NivelOrdenDto>)
+    - NivelOrdenDto (Precio, CantidadTotal, NumeroOrdenes) - vista agregada
+    - LibroOrdenesDetalleDto (Compras: List<LibroOrdenEntradaDto>, Ventas: List<LibroOrdenEntradaDto>)
+    - LibroOrdenEntradaDto (Id, Cantidad, PrecioUnitario, FechaCreacion) - vista individual
+
+  X-Chang.CORE\Core\Interfaces\IOrdenService.cs
+    - ObtenerLibroOrdenesAsync(parMonedaId) -> LibroOrdenesDto
+    - ObtenerLibroOrdenesDetalleAsync(parMonedaId, limite) -> LibroOrdenesDetalleDto
+
+  X-Chang.CORE\Core\Services\OrdenService.cs
+    - ObtenerLibroOrdenesAsync: compras ordenadas mayor a menor precio, ventas menor a mayor
+    - ObtenerLibroOrdenesDetalleAsync: entradas individuales con fecha de creacion
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\OrdenesController.cs
+    - GET /api/ordenes/libro/{parMonedaId}
+    - GET /api/ordenes/libro/{parMonedaId}/detalle?limite=10
+
+
+US-013 - Generacion de orden de compra
+--------------------------------------------------------------------
+Responsable: Mattias Caballero Salazar
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\OrdenDTOs.cs
+    - CrearOrdenRequest (ParMonedaId, Cantidad, PrecioUnitario)
+    - OrdenDto (respuesta completa con estado y totales)
+
+  X-Chang.CORE\Core\Interfaces\IOrdenService.cs
+    - CrearOrdenCompraAsync(usuarioId, CrearOrdenRequest) -> OrdenDto
+
+  X-Chang.CORE\Core\Services\OrdenService.cs
+    - CrearOrdenCompraAsync: valida saldo, reserva fondos, crea orden, ejecuta matching
+
+  X-Chang.CORE\Core\Services\MatchingService.cs
+    - EjecutarMatchingOrdenAsync: cruza con ofertas de venta compatibles
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\OrdenesController.cs
+    - POST /api/ordenes  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\OrdenesCompra.cs
+  X-Chang.CORE\Core\Entities\EjecucionesOrden.cs
+  X-Chang.CORE\Core\Entities\SaldosBilletera.cs
+
+
+US-014 - Generacion de oferta de venta
+--------------------------------------------------------------------
+Responsable: Mattias Caballero Salazar
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\OfertaDTOs.cs
+    - CrearOfertaRequest (ParMonedaId, Cantidad, PrecioUnitario)
+    - OfertaDto (respuesta completa con estado y totales)
+
+  X-Chang.CORE\Core\Interfaces\IOfertaService.cs
+    - CrearOfertaVentaAsync(usuarioId, CrearOfertaRequest) -> OfertaDto
+
+  X-Chang.CORE\Core\Services\OfertaService.cs
+    - CrearOfertaVentaAsync: valida saldo, reserva moneda, crea oferta, ejecuta matching
+
+  X-Chang.CORE\Core\Services\MatchingService.cs
+    - EjecutarMatchingOfertaAsync: cruza con ordenes de compra compatibles
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\OfertasController.cs
+    - POST /api/ofertas  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\OfertasVenta.cs
+  X-Chang.CORE\Core\Entities\EjecucionesOrden.cs
+  X-Chang.CORE\Core\Entities\SaldosBilletera.cs
+
+
+US-015 - Compra inmediata
+--------------------------------------------------------------------
+Responsable: Domenico Chang
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\OperacionDTOs.cs
+    - OperacionInmediataRequest
+    - OperacionInmediataDto (PrecioMinimo, PrecioMaximo, PrecioPromedio, TotalPagado)
+    - EjecucionDto
+
+  X-Chang.CORE\Core\DTOs\RutaDTOs.cs
+    - BuscarRutaRequest (ParMonedaId, Cantidad, MaxSaltos)
+    - RutaConversionDto (TotalEstimado, AhorroEstimado, lista SaltoRutaDto)
+    - SaltoRutaDto (Par, Cantidad, PrecioMinimo, PrecioMaximo)
+
+  X-Chang.CORE\Core\Interfaces\IOperacionInmediataService.cs
+    - (ejecuta compra contra ofertas disponibles comenzando por menor precio)
+
+  X-Chang.CORE\Core\Interfaces\IRutaConversionService.cs
+    - BuscarRutaAsync: busca ruta mas barata con hasta N saltos
+
+  X-Chang.CORE\Core\Services\OperacionInmediataService.cs
+  X-Chang.CORE\Core\Services\RutaConversionService.cs
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\OperacionController.cs
+    - POST /api/operaciones  [Authorize]  (TipoOperacion: "Compra")
+
+  X-Chang.API\Controllers\RutaController.cs
+    - POST /api/rutas/buscar  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\OperacionesInmediatas.cs
+  X-Chang.CORE\Core\Entities\OperacionInmediataEjecuciones.cs
+  X-Chang.CORE\Core\Entities\BusquedasRuta.cs
+  X-Chang.CORE\Core\Entities\RutasConversion.cs
+  X-Chang.CORE\Core\Entities\RutaConversionSaltos.cs
+
+
+US-016 - Venta inmediata
+--------------------------------------------------------------------
+Responsable: Domenico Chang
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\OperacionDTOs.cs
+    - OperacionInmediataRequest (TipoOperacion: "Venta")
+    - OperacionInmediataDto (PrecioMinimo, PrecioMaximo, PrecioPromedio, TotalRecibido)
+
+  X-Chang.CORE\Core\DTOs\RutaDTOs.cs
+    - BuscarRutaRequest (para buscar ruta mas rentable)
+    - RutaConversionDto (GananciaEstimada)
+
+  X-Chang.CORE\Core\Interfaces\IOperacionInmediataService.cs
+    - (ejecuta venta contra ordenes disponibles comenzando por mayor precio)
+
+  X-Chang.CORE\Core\Services\OperacionInmediataService.cs
+  X-Chang.CORE\Core\Services\RutaConversionService.cs
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\OperacionController.cs
+    - POST /api/operaciones  [Authorize]  (TipoOperacion: "Venta")
+
+  X-Chang.API\Controllers\RutaController.cs
+    - POST /api/rutas/buscar  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\OperacionesInmediatas.cs
+  X-Chang.CORE\Core\Entities\OperacionInmediataEjecuciones.cs
+  X-Chang.CORE\Core\Entities\RutasConversion.cs
+  X-Chang.CORE\Core\Entities\RutaConversionSaltos.cs
+
+
+US-017 - Historial de transacciones
+--------------------------------------------------------------------
+Responsable: Leslie Neciosup
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\HistorialDTOs.cs
+    - FiltroColumnaRequest (Desde, Hasta, Pagina, TamanoPagina)
+    - HistorialOrdenDto (FechaHora, Par, cantidades, precio, totales, estado)
+    - HistorialOfertaDto (FechaHora, Par, cantidades, precio, totales, estado)
+    - HistorialCompraInmediataDto (FechaHora, Par, precio min/max/promedio, TotalPagado, MetodoEjecucion, SubOperaciones)
+    - HistorialVentaInmediataDto (FechaHora, Par, precio min/max/promedio, TotalRecibido, MetodoEjecucion, SubOperaciones)
+    - HistorialDepositoDto (FechaHora, Moneda, monto, metodo, comision, estado)
+    - HistorialRetiroDto (FechaHora, Moneda, monto, metodo, comision, monto final, estado)
+    - HistorialCompletoDto (6 secciones con PagedResult independiente)
+
+  X-Chang.CORE\Core\Interfaces\IHistorialService.cs
+    - ObtenerHistorialCompletoAsync(...6 filtros...) -> HistorialCompletoDto
+
+  X-Chang.CORE\Core\Services\HistorialService.cs
+    - ObtenerHistorialCompletoAsync: ejecuta 6 consultas independientes en paralelo
+    - Sub-operaciones de Mejor ruta incluidas en ComprasInmediatas y VentasInmediatas
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\HistorialController.cs
+    - GET /api/historial/completo  [Authorize]
+      Params por columna: ordenesDesde, ordenesHasta, ordenesPagina, ordenesTamano,
+      ofertasDesde, ofertasHasta, ... (igual para compras, ventas, depositos, retiros)
+
+
+US-018 - Notificaciones por correo electronico
+--------------------------------------------------------------------
+Responsable: Leslie Neciosup
+
+Entidades de base de datos (estructura preparada):
+  X-Chang.CORE\Core\Entities\NotificacionesCorreo.cs
+  X-Chang.CORE\Core\Entities\AdjuntosCorreo.cs
+  X-Chang.CORE\Core\Entities\TiposNotificacion.cs
+
+Nota: La tabla de notificaciones existe en la BD. Para envio real de correos
+      se necesita implementar un servicio SMTP (ej. SendGrid, MailKit) y
+      un INotificacionService que se llame desde los servicios existentes
+      en los eventos: ejecucion de orden/oferta, cancelacion, deposito, retiro.
+
+
+US-019 - Panel administrativo - vision general de operaciones
+--------------------------------------------------------------------
+Responsable: Domenico Chang
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\AdminDTOs.cs
+    - FiltroDashboardRequest (Desde, Hasta)
+    - DashboardDto (TotalUsuarios, UsuariosActivos, OrdenesActivas, TransaccionesEjecutadas,
+      TotalDepositos, TotalRetiros, VolumenTotal, TopPares, VolumenPorDia,
+      OperacionesPorDia, VolumenPorMoneda, DistribucionPorTipo)
+    - DashboardDiaDto, DashboardMonedaDto, DashboardTipoDto
+
+  X-Chang.CORE\Core\Interfaces\IAdminService.cs
+    - ObtenerDashboardAsync(FiltroDashboardRequest) -> DashboardDto
+
+  X-Chang.CORE\Core\Services\AdminService.cs
+    - ObtenerDashboardAsync: calcula todas las metricas en el rango de fechas
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\Admin\AdminDashboardController.cs
+    - GET /api/admin/dashboard?Desde=&Hasta=  [Authorize(Roles="Admin")]
+
+  X-Chang.API\Controllers\Admin\AdminReportesController.cs
+    - GET /api/admin/configuracion
+    - GET /api/admin/reportes/historial
+    - GET /api/admin/reportes/pares
+
+
+US-020 - Gestion de usuarios por parte del administrador
+--------------------------------------------------------------------
+Responsable: Domenico Chang
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\AdminDTOs.cs
+    - AdminUsuarioDto (UsuarioId, NombreUsuario, Correo, Rol, Pais, Estado, fechas)
+    - FiltroAdminRequest (NombreUsuario, CorreoElectronico, Estado, Pagina, TamanoPagina)
+    - RestringirUsuarioRequest (UsuarioId, Mensaje)
+    - HabilitarUsuarioRequest (UsuarioId, Mensaje)
+
+  X-Chang.CORE\Core\Interfaces\IAdminService.cs
+    - ObtenerUsuariosAsync(FiltroAdminRequest) -> PagedResult<AdminUsuarioDto>
+    - ObtenerUsuarioAsync(usuarioId) -> AdminUsuarioDto
+    - RestringirUsuarioAsync(adminId, RestringirUsuarioRequest)
+    - HabilitarUsuarioAsync(adminId, HabilitarUsuarioRequest)
+
+  X-Chang.CORE\Core\Services\AdminService.cs
+    - RestringirUsuarioAsync: cambia estado a Restringido, cancela TODAS las ordenes
+      y ofertas activas, reembolsa saldos, registra en auditoria
+    - HabilitarUsuarioAsync: cambia estado a Activo, registra en auditoria
+    - ObtenerUsuariosAsync: filtra por nombre, correo, estado
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\Admin\AdminUsuariosController.cs
+    - GET  /api/admin/usuarios?NombreUsuario=&CorreoElectronico=&Estado=  [Authorize(Roles="Admin")]
+    - GET  /api/admin/usuarios/{id}
+    - PUT  /api/admin/usuarios/{id}/estado
+    - POST /api/admin/usuarios/{id}/restringir
+    - POST /api/admin/usuarios/{id}/habilitar
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\Usuarios.cs
+  X-Chang.CORE\Core\Entities\RestriccionesUsuario.cs
+  X-Chang.CORE\Core\Entities\AuditoriaAdministrativa.cs
+
+
+US-021 - Log de auditoria administrativa
+--------------------------------------------------------------------
+Responsable: Domenico Chang
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\AdminDTOs.cs
+    - FiltroAuditoriaRequest (Desde, Hasta, Administrador, UsuarioAfectado, TipoAccion, Pagina, TamanoPagina)
+    - AuditoriaDto (AuditoriaId, Administrador, UsuarioAfectado, TipoAccion, MensajeRegistrado, FechaHora)
+
+  X-Chang.CORE\Core\Interfaces\IAdminService.cs
+    - ObtenerAuditoriaAsync(FiltroAuditoriaRequest) -> PagedResult<AuditoriaDto>
+
+  X-Chang.CORE\Core\Services\AdminService.cs
+    - ObtenerAuditoriaAsync: filtra por fecha, nombre admin, nombre usuario afectado,
+      tipo de accion (Restriccion | Habilitacion | Todos)
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\Admin\AdminUsuariosController.cs
+    - GET /api/admin/usuarios/auditoria?Desde=&Hasta=&Administrador=&UsuarioAfectado=&TipoAccion=  [Authorize(Roles="Admin")]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\AuditoriaAdministrativa.cs
+
+
+US-022 - Cancelacion de orden u oferta
+--------------------------------------------------------------------
+Responsable: Jair Menendez Limaylla
+
+Backend (X-Chang.CORE):
+  X-Chang.CORE\Core\DTOs\OrdenDTOs.cs
+    - OrdenDto (incluye Estado para validar si es cancelable)
+
+  X-Chang.CORE\Core\DTOs\OfertaDTOs.cs
+    - OfertaDto (incluye Estado para validar si es cancelable)
+
+  X-Chang.CORE\Core\Interfaces\IOrdenService.cs
+    - ObtenerOrdenAsync(usuarioId, ordenId) -> OrdenDto  (para mostrar detalle antes de cancelar)
+    - CancelarOrdenAsync(usuarioId, ordenId)
+
+  X-Chang.CORE\Core\Interfaces\IOfertaService.cs
+    - ObtenerOfertaAsync(usuarioId, ofertaId) -> OfertaDto
+    - CancelarOfertaAsync(usuarioId, ofertaId)
+
+  X-Chang.CORE\Core\Services\OrdenService.cs
+    - CancelarOrdenAsync: valida estado (solo Activa o Parcial), reembolsa
+      CantidadPendiente * PrecioUnitario a billetera, registra cancelacion e historial
+
+  X-Chang.CORE\Core\Services\OfertaService.cs
+    - CancelarOfertaAsync: valida estado, reembolsa CantidadPendiente a billetera,
+      registra cancelacion e historial
+
+Backend (X-Chang.API):
+  X-Chang.API\Controllers\OrdenesController.cs
+    - GET    /api/ordenes/{id}  [Authorize]  (obtener detalle antes de confirmar cancelacion)
+    - DELETE /api/ordenes/{id}  [Authorize]  (confirmar cancelacion)
+
+  X-Chang.API\Controllers\OfertasController.cs
+    - GET    /api/ofertas/{id}  [Authorize]
+    - DELETE /api/ofertas/{id}  [Authorize]
+
+Entidades relacionadas:
+  X-Chang.CORE\Core\Entities\CancelacionesOrdenOferta.cs
+  X-Chang.CORE\Core\Entities\MovimientosBilletera.cs
+  X-Chang.CORE\Core\Entities\HistorialTransacciones.cs
+
+====================================================================
+ARCHIVOS DE INFRAESTRUCTURA COMPARTIDOS
+====================================================================
+
+Autenticacion / Sesiones:
+  X-Chang.API\Authentication\SessionAuthHandler.cs
+  X-Chang.CORE\Core\Settings\SessionSettings.cs
+  X-Chang.CORE\Core\Entities\SesionesUsuario.cs
+  X-Chang.CORE\Core\Entities\AccesosUsuario.cs
+
+Base de datos:
+  X-Chang.CORE\Infrastructure\Data\ExchangeDivisasDbContext.cs
+
+Registro de servicios (DI):
+  X-Chang.CORE\Infrastructure\Extensions\ServiceCollectionExtensions.cs
+
+Configuracion de la API:
+  X-Chang.API\Program.cs
+  X-Chang.API\appsettings.json
+
+Matching (motor de cruce de ordenes - usado por US-013, US-014, US-015, US-016):
+  X-Chang.CORE\Core\Interfaces\IMatchingService.cs
+  X-Chang.CORE\Core\Services\MatchingService.cs
+
+====================================================================

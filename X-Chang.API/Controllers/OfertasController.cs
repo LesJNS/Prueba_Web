@@ -39,9 +39,9 @@ public class OfertasController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> ObtenerMisOfertas()
+    public async Task<IActionResult> ObtenerMisOfertas([FromQuery] FiltroOfertasRequest filtro)
     {
-        var result = await _ofertaService.ObtenerMisOfertasAsync(UsuarioId);
+        var result = await _ofertaService.ObtenerMisOfertasAsync(UsuarioId, filtro);
         return Ok(result);
     }
 

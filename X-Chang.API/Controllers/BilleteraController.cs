@@ -92,4 +92,18 @@ public class BilleteraController : ControllerBase
         var result = await _billeteraService.ObtenerRetirosAsync(UsuarioId);
         return Ok(result);
     }
+
+    [HttpGet("metodos-pago")]
+    public async Task<IActionResult> ObtenerMetodosPago()
+    {
+        try
+        {
+            var result = await _billeteraService.ObtenerMetodosPagoAsync(UsuarioId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
 }

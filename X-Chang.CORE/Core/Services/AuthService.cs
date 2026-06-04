@@ -72,9 +72,11 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
     {
+        var id = request.IdentificadorAcceso.Trim();
         var usuario = await _context.Usuarios
             .Include(u => u.Rol)
-            .FirstOrDefaultAsync(u => u.CorreoElectronico == request.CorreoElectronico);
+            .FirstOrDefaultAsync(u =>
+                u.CorreoElectronico == id || u.NombreUsuario == id);
 
         var exitoso = usuario != null && BCrypt.Net.BCrypt.Verify(request.Password, usuario.PasswordHash);
 
@@ -150,6 +152,18 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("La contraseña actual es incorrecta.");
 
         usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.PasswordNuevo);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task CambiarTemaAsync(int usuarioId, string temaVisual)
+    {
+        if (temaVisual != "Claro" && temaVisual != "Oscuro")
+            throw new ArgumentException("El tema debe ser 'Claro' u 'Oscuro'.");
+
+        var usuario = await _context.Usuarios.FindAsync(usuarioId)
+            ?? throw new InvalidOperationException("Usuario no encontrado.");
+
+        usuario.TemaVisual = temaVisual;
         await _context.SaveChangesAsync();
     }
 

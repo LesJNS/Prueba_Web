@@ -21,6 +21,12 @@ public class AdminService : IAdminService
             .Include(u => u.Pais)
             .AsQueryable();
 
+        if (!string.IsNullOrWhiteSpace(filtro.NombreUsuario))
+            query = query.Where(u => u.NombreUsuario.Contains(filtro.NombreUsuario));
+
+        if (!string.IsNullOrWhiteSpace(filtro.CorreoElectronico))
+            query = query.Where(u => u.CorreoElectronico.Contains(filtro.CorreoElectronico));
+
         if (!string.IsNullOrWhiteSpace(filtro.Filtro))
         {
             var f = filtro.Filtro.ToLower();
@@ -62,7 +68,7 @@ public class AdminService : IAdminService
 
     public async Task CambiarEstadoUsuarioAsync(int adminId, CambiarEstadoUsuarioRequest request)
     {
-        var estadosValidos = new[] { "Activo", "Bloqueado", "Suspendido" };
+        var estadosValidos = new[] { "Activo", "Bloqueado", "Suspendido", "Restringido" };
         if (!estadosValidos.Contains(request.NuevoEstado))
             throw new ArgumentException($"Estado no válido. Permitidos: {string.Join(", ", estadosValidos)}");
 
@@ -78,6 +84,117 @@ public class AdminService : IAdminService
             UsuarioAfectadoId = request.UsuarioId,
             TipoAccion = "CambioEstado",
             MensajeRegistrado = $"Estado cambiado de {estadoAnterior} a {request.NuevoEstado}. Motivo: {request.Motivo}",
+            FechaHora = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task RestringirUsuarioAsync(int adminId, RestringirUsuarioRequest request)
+    {
+        var usuario = await _context.Usuarios
+            .Include(u => u.OrdenesCompra.Where(o => o.Estado == "Activa" || o.Estado == "Parcial"))
+            .ThenInclude(o => o.ParMoneda)
+            .Include(u => u.OfertasVenta.Where(o => o.Estado == "Activa" || o.Estado == "Parcial"))
+            .ThenInclude(o => o.ParMoneda)
+            .FirstOrDefaultAsync(u => u.UsuarioId == request.UsuarioId)
+            ?? throw new InvalidOperationException("Usuario no encontrado.");
+
+        if (usuario.Estado == "Restringido")
+            throw new InvalidOperationException("El usuario ya está restringido.");
+
+        await using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var billetera = await _context.Billeteras
+                .FirstOrDefaultAsync(b => b.UsuarioId == request.UsuarioId);
+
+            foreach (var orden in usuario.OrdenesCompra)
+            {
+                var montoReembolso = orden.CantidadPendiente * orden.PrecioUnitario;
+                orden.Estado = "Cancelada";
+                orden.FechaCancelacion = DateTime.UtcNow;
+                orden.FechaActualizacion = DateTime.UtcNow;
+
+                if (billetera != null)
+                {
+                    var saldo = await BilleteraService.ObtenerOCrearSaldoInternoAsync(
+                        _context, billetera.BilleteraId, orden.ParMoneda.MonedaOrigenId);
+                    var ant = saldo.SaldoDisponible;
+                    saldo.SaldoDisponible += montoReembolso;
+                    saldo.FechaActualizacion = DateTime.UtcNow;
+                    _context.MovimientosBilletera.Add(new MovimientosBilletera
+                    {
+                        UsuarioId = request.UsuarioId, MonedaId = orden.ParMoneda.MonedaOrigenId,
+                        TipoMovimiento = "DevolucionOrden", Monto = montoReembolso,
+                        SaldoAnterior = ant, SaldoPosterior = saldo.SaldoDisponible,
+                        FechaMovimiento = DateTime.UtcNow,
+                        ReferenciaTipo = "OrdenCompra", ReferenciaId = orden.OrdenCompraId
+                    });
+                }
+            }
+
+            foreach (var oferta in usuario.OfertasVenta)
+            {
+                oferta.Estado = "Cancelada";
+                oferta.FechaCancelacion = DateTime.UtcNow;
+                oferta.FechaActualizacion = DateTime.UtcNow;
+
+                if (billetera != null)
+                {
+                    var saldo = await BilleteraService.ObtenerOCrearSaldoInternoAsync(
+                        _context, billetera.BilleteraId, oferta.ParMoneda.MonedaDestinoId);
+                    var ant = saldo.SaldoDisponible;
+                    saldo.SaldoDisponible += oferta.CantidadPendiente;
+                    saldo.FechaActualizacion = DateTime.UtcNow;
+                    _context.MovimientosBilletera.Add(new MovimientosBilletera
+                    {
+                        UsuarioId = request.UsuarioId, MonedaId = oferta.ParMoneda.MonedaDestinoId,
+                        TipoMovimiento = "DevolucionOferta", Monto = oferta.CantidadPendiente,
+                        SaldoAnterior = ant, SaldoPosterior = saldo.SaldoDisponible,
+                        FechaMovimiento = DateTime.UtcNow,
+                        ReferenciaTipo = "OfertaVenta", ReferenciaId = oferta.OfertaVentaId
+                    });
+                }
+            }
+
+            usuario.Estado = "Restringido";
+
+            _context.AuditoriaAdministrativa.Add(new AuditoriaAdministrativa
+            {
+                AdministradorId = adminId,
+                UsuarioAfectadoId = request.UsuarioId,
+                TipoAccion = "Restriccion",
+                MensajeRegistrado = request.Mensaje,
+                FechaHora = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task HabilitarUsuarioAsync(int adminId, HabilitarUsuarioRequest request)
+    {
+        var usuario = await _context.Usuarios.FindAsync(request.UsuarioId)
+            ?? throw new InvalidOperationException("Usuario no encontrado.");
+
+        if (usuario.Estado == "Activo")
+            throw new InvalidOperationException("El usuario ya está activo.");
+
+        usuario.Estado = "Activo";
+
+        _context.AuditoriaAdministrativa.Add(new AuditoriaAdministrativa
+        {
+            AdministradorId = adminId,
+            UsuarioAfectadoId = request.UsuarioId,
+            TipoAccion = "Habilitacion",
+            MensajeRegistrado = request.Mensaje,
             FechaHora = DateTime.UtcNow
         });
 
@@ -122,22 +239,27 @@ public class AdminService : IAdminService
             restriccion.EstadoRestriccion);
     }
 
-    public async Task<PagedResult<AuditoriaDto>> ObtenerAuditoriaAsync(
-        DateTime? desde, DateTime? hasta, int pagina, int tamano)
+    public async Task<PagedResult<AuditoriaDto>> ObtenerAuditoriaAsync(FiltroAuditoriaRequest filtro)
     {
         var query = _context.AuditoriaAdministrativa
             .Include(a => a.Administrador)
             .Include(a => a.UsuarioAfectado)
             .AsQueryable();
 
-        if (desde.HasValue) query = query.Where(a => a.FechaHora >= desde.Value);
-        if (hasta.HasValue) query = query.Where(a => a.FechaHora <= hasta.Value);
+        if (filtro.Desde.HasValue) query = query.Where(a => a.FechaHora >= filtro.Desde.Value);
+        if (filtro.Hasta.HasValue) query = query.Where(a => a.FechaHora <= filtro.Hasta.Value);
+        if (!string.IsNullOrWhiteSpace(filtro.Administrador))
+            query = query.Where(a => a.Administrador.NombreUsuario.Contains(filtro.Administrador));
+        if (!string.IsNullOrWhiteSpace(filtro.UsuarioAfectado))
+            query = query.Where(a => a.UsuarioAfectado.NombreUsuario.Contains(filtro.UsuarioAfectado));
+        if (!string.IsNullOrWhiteSpace(filtro.TipoAccion) && filtro.TipoAccion != "Todos")
+            query = query.Where(a => a.TipoAccion == filtro.TipoAccion);
 
         var total = await query.CountAsync();
         var items = await query
             .OrderByDescending(a => a.FechaHora)
-            .Skip((pagina - 1) * tamano)
-            .Take(tamano)
+            .Skip((filtro.Pagina - 1) * filtro.TamanoPagina)
+            .Take(filtro.TamanoPagina)
             .Select(a => new AuditoriaDto(
                 a.AuditoriaId,
                 a.Administrador.NombreUsuario,
@@ -147,37 +269,38 @@ public class AdminService : IAdminService
                 a.FechaHora))
             .ToListAsync();
 
-        return new PagedResult<AuditoriaDto>(items, total, pagina, tamano);
+        return new PagedResult<AuditoriaDto>(items, total, filtro.Pagina, filtro.TamanoPagina);
     }
 
-    public async Task<DashboardDto> ObtenerDashboardAsync()
+    public async Task<DashboardDto> ObtenerDashboardAsync(FiltroDashboardRequest filtro)
     {
-        var hoy = DateTime.UtcNow.Date;
-        var manana = hoy.AddDays(1);
+        var desde = filtro.Desde ?? DateTime.UtcNow.Date.AddDays(-30);
+        var hasta = filtro.Hasta ?? DateTime.UtcNow;
 
         var totalUsuarios = await _context.Usuarios.CountAsync();
-        var usuariosActivos = await _context.Usuarios.CountAsync(u => u.Estado == "Activo");
+        var usuariosActivos = await _context.Usuarios
+            .CountAsync(u => u.FechaUltimoAcceso >= desde && u.FechaUltimoAcceso <= hasta);
         var ordenesActivasCompra = await _context.OrdenesCompra.CountAsync(o => o.Estado == "Activa");
         var ordenesActivasVenta = await _context.OfertasVenta.CountAsync(o => o.Estado == "Activa");
-        var operacionesHoy = await _context.HistorialTransacciones
-            .CountAsync(h => h.FechaHora >= hoy && h.FechaHora < manana);
+        var transacciones = await _context.EjecucionesOrden
+            .CountAsync(e => e.FechaEjecucion >= desde && e.FechaEjecucion <= hasta);
 
-        var volumenHoy = await _context.EjecucionesOrden
-            .Where(e => e.FechaEjecucion >= hoy && e.FechaEjecucion < manana)
-            .GroupBy(e => 1)
-            .Select(g => new
-            {
-                VolumenCompra = g.Sum(e => e.CantidadEjecutada),
-                VolumenVenta = g.Sum(e => e.TotalOperacion)
-            })
-            .FirstOrDefaultAsync();
+        var totalDepositos = await _context.Depositos
+            .Where(d => d.FechaDeposito >= desde && d.FechaDeposito <= hasta)
+            .SumAsync(d => (decimal?)d.MontoDepositado) ?? 0;
+
+        var totalRetiros = await _context.Retiros
+            .Where(r => r.FechaRetiro >= desde && r.FechaRetiro <= hasta)
+            .SumAsync(r => (decimal?)r.MontoRetirado) ?? 0;
+
+        var volumenTotal = await _context.EjecucionesOrden
+            .Where(e => e.FechaEjecucion >= desde && e.FechaEjecucion <= hasta)
+            .SumAsync(e => (decimal?)e.CantidadEjecutada) ?? 0;
 
         var topPares = await _context.EjecucionesOrden
-            .Include(e => e.ParMoneda)
-            .ThenInclude(p => p.MonedaOrigen)
-            .Include(e => e.ParMoneda)
-            .ThenInclude(p => p.MonedaDestino)
-            .Where(e => e.FechaEjecucion >= hoy && e.FechaEjecucion < manana)
+            .Include(e => e.ParMoneda).ThenInclude(p => p.MonedaOrigen)
+            .Include(e => e.ParMoneda).ThenInclude(p => p.MonedaDestino)
+            .Where(e => e.FechaEjecucion >= desde && e.FechaEjecucion <= hasta)
             .GroupBy(e => new
             {
                 e.ParMonedaId,
@@ -194,13 +317,40 @@ public class AdminService : IAdminService
             .Take(5)
             .ToListAsync();
 
+        var volumenPorDia = await _context.EjecucionesOrden
+            .Where(e => e.FechaEjecucion >= desde && e.FechaEjecucion <= hasta)
+            .GroupBy(e => e.FechaEjecucion.Date)
+            .Select(g => new DashboardDiaDto(g.Key, g.Sum(e => e.CantidadEjecutada)))
+            .OrderBy(d => d.Dia)
+            .ToListAsync();
+
+        var operacionesPorDia = await _context.EjecucionesOrden
+            .Where(e => e.FechaEjecucion >= desde && e.FechaEjecucion <= hasta)
+            .GroupBy(e => e.FechaEjecucion.Date)
+            .Select(g => new DashboardDiaDto(g.Key, g.Count()))
+            .OrderBy(d => d.Dia)
+            .ToListAsync();
+
+        var volumenPorMoneda = await _context.EjecucionesOrden
+            .Include(e => e.ParMoneda).ThenInclude(p => p.MonedaOrigen)
+            .Where(e => e.FechaEjecucion >= desde && e.FechaEjecucion <= hasta)
+            .GroupBy(e => e.ParMoneda.MonedaOrigen.CodigoIso)
+            .Select(g => new DashboardMonedaDto(g.Key, g.Sum(e => e.CantidadEjecutada), g.Count()))
+            .OrderByDescending(m => m.VolumenTotal)
+            .ToListAsync();
+
+        var distribucionPorTipo = await _context.HistorialTransacciones
+            .Where(h => h.FechaHora >= desde && h.FechaHora <= hasta)
+            .GroupBy(h => h.TipoOperacion)
+            .Select(g => new DashboardTipoDto(g.Key, g.Count()))
+            .ToListAsync();
+
         return new DashboardDto(
             totalUsuarios, usuariosActivos,
             ordenesActivasCompra, ordenesActivasVenta,
-            operacionesHoy,
-            volumenHoy?.VolumenCompra ?? 0,
-            volumenHoy?.VolumenVenta ?? 0,
-            topPares);
+            transacciones, totalDepositos, totalRetiros, volumenTotal,
+            topPares, volumenPorDia, operacionesPorDia,
+            volumenPorMoneda, distribucionPorTipo);
     }
 
     public async Task<List<ConfiguracionDto>> ObtenerConfiguracionesAsync()

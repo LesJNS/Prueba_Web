@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IRutaConversionService, RutaConversionService>();
         services.AddScoped<IHistorialService, HistorialService>();
         services.AddScoped<IAdminService, AdminService>();
+        services.AddScoped<IParesMonedasService, ParesMonedasService>();
 
         return services;
     }

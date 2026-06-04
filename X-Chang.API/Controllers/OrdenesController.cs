@@ -39,9 +39,9 @@ public class OrdenesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> ObtenerMisOrdenes()
+    public async Task<IActionResult> ObtenerMisOrdenes([FromQuery] FiltroOrdenesRequest filtro)
     {
-        var result = await _ordenService.ObtenerMisOrdenesAsync(UsuarioId);
+        var result = await _ordenService.ObtenerMisOrdenesAsync(UsuarioId, filtro);
         return Ok(result);
     }
 
@@ -77,6 +77,13 @@ public class OrdenesController : ControllerBase
     public async Task<IActionResult> ObtenerLibroOrdenes(int parMonedaId)
     {
         var result = await _ordenService.ObtenerLibroOrdenesAsync(parMonedaId);
+        return Ok(result);
+    }
+
+    [HttpGet("libro/{parMonedaId:int}/detalle")]
+    public async Task<IActionResult> ObtenerLibroOrdenesDetalle(int parMonedaId, [FromQuery] int limite = 10)
+    {
+        var result = await _ordenService.ObtenerLibroOrdenesDetalleAsync(parMonedaId, limite);
         return Ok(result);
     }
 }

@@ -105,18 +105,34 @@ public class OfertaService : IOfertaService
         }
     }
 
-    public async Task<List<OfertaDto>> ObtenerMisOfertasAsync(int usuarioId)
+    public async Task<PagedResult<OfertaDto>> ObtenerMisOfertasAsync(int usuarioId, FiltroOfertasRequest filtro)
     {
-        var ofertas = await _context.OfertasVenta
+        var query = _context.OfertasVenta
             .Include(o => o.ParMoneda)
             .ThenInclude(p => p.MonedaOrigen)
             .Include(o => o.ParMoneda)
             .ThenInclude(p => p.MonedaDestino)
             .Where(o => o.UsuarioId == usuarioId)
-            .OrderByDescending(o => o.FechaCreacion)
+            .AsQueryable();
+
+        if (filtro.Desde.HasValue)
+            query = query.Where(o => o.FechaCreacion >= filtro.Desde.Value);
+        if (filtro.Hasta.HasValue)
+            query = query.Where(o => o.FechaCreacion <= filtro.Hasta.Value);
+        if (!string.IsNullOrWhiteSpace(filtro.Estado))
+            query = query.Where(o => o.Estado == filtro.Estado);
+
+        query = query.OrderByDescending(o => o.FechaCreacion);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .Skip((filtro.Pagina - 1) * filtro.TamanoPagina)
+            .Take(filtro.TamanoPagina)
             .ToListAsync();
 
-        return ofertas.Select(o => MapOfertaDto(o, o.ParMoneda)).ToList();
+        return new PagedResult<OfertaDto>(
+            items.Select(o => MapOfertaDto(o, o.ParMoneda)).ToList(),
+            total, filtro.Pagina, filtro.TamanoPagina);
     }
 
     public async Task<OfertaDto> ObtenerOfertaAsync(int usuarioId, int ofertaId)

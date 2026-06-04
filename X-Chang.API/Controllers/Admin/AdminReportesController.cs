@@ -54,9 +54,9 @@ public class AdminReportesController : ControllerBase
     }
 
     [HttpGet("reportes/pares")]
-    public async Task<IActionResult> ReportePares()
+    public async Task<IActionResult> ReportePares([FromQuery] FiltroDashboardRequest filtro)
     {
-        var dashboard = await _adminService.ObtenerDashboardAsync();
+        var dashboard = await _adminService.ObtenerDashboardAsync(filtro);
         return Ok(new { TopPares = dashboard.TopPares });
     }
 }

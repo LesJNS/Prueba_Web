@@ -107,18 +107,34 @@ public class OrdenService : IOrdenService
         }
     }
 
-    public async Task<List<OrdenDto>> ObtenerMisOrdenesAsync(int usuarioId)
+    public async Task<PagedResult<OrdenDto>> ObtenerMisOrdenesAsync(int usuarioId, FiltroOrdenesRequest filtro)
     {
-        var ordenes = await _context.OrdenesCompra
+        var query = _context.OrdenesCompra
             .Include(o => o.ParMoneda)
             .ThenInclude(p => p.MonedaOrigen)
             .Include(o => o.ParMoneda)
             .ThenInclude(p => p.MonedaDestino)
             .Where(o => o.UsuarioId == usuarioId)
-            .OrderByDescending(o => o.FechaCreacion)
+            .AsQueryable();
+
+        if (filtro.Desde.HasValue)
+            query = query.Where(o => o.FechaCreacion >= filtro.Desde.Value);
+        if (filtro.Hasta.HasValue)
+            query = query.Where(o => o.FechaCreacion <= filtro.Hasta.Value);
+        if (!string.IsNullOrWhiteSpace(filtro.Estado))
+            query = query.Where(o => o.Estado == filtro.Estado);
+
+        query = query.OrderByDescending(o => o.FechaCreacion);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .Skip((filtro.Pagina - 1) * filtro.TamanoPagina)
+            .Take(filtro.TamanoPagina)
             .ToListAsync();
 
-        return ordenes.Select(o => MapOrdenDto(o, o.ParMoneda)).ToList();
+        return new PagedResult<OrdenDto>(
+            items.Select(o => MapOrdenDto(o, o.ParMoneda)).ToList(),
+            total, filtro.Pagina, filtro.TamanoPagina);
     }
 
     public async Task<OrdenDto> ObtenerOrdenAsync(int usuarioId, int ordenId)
@@ -223,6 +239,27 @@ public class OrdenService : IOrdenService
             .ToListAsync();
 
         return new LibroOrdenesDto(compras, ventas);
+    }
+
+    public async Task<LibroOrdenesDetalleDto> ObtenerLibroOrdenesDetalleAsync(int parMonedaId, int limite = 10)
+    {
+        var compras = await _context.OrdenesCompra
+            .Where(o => o.ParMonedaId == parMonedaId && o.Estado == "Activa")
+            .OrderByDescending(o => o.PrecioUnitario)
+            .Take(limite)
+            .Select(o => new LibroOrdenEntradaDto(
+                o.OrdenCompraId, o.CantidadPendiente, o.PrecioUnitario, o.FechaCreacion))
+            .ToListAsync();
+
+        var ventas = await _context.OfertasVenta
+            .Where(o => o.ParMonedaId == parMonedaId && o.Estado == "Activa")
+            .OrderBy(o => o.PrecioUnitario)
+            .Take(limite)
+            .Select(o => new LibroOrdenEntradaDto(
+                o.OfertaVentaId, o.CantidadPendiente, o.PrecioUnitario, o.FechaCreacion))
+            .ToListAsync();
+
+        return new LibroOrdenesDetalleDto(compras, ventas);
     }
 
     private static OrdenDto MapOrdenDto(OrdenesCompra o, ParesMoneda par) =>

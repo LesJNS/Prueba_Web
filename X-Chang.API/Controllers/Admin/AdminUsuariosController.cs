@@ -79,14 +79,42 @@ public class AdminUsuariosController : ControllerBase
         }
     }
 
-    [HttpGet("auditoria")]
-    public async Task<IActionResult> ObtenerAuditoria(
-        [FromQuery] DateTime? desde,
-        [FromQuery] DateTime? hasta,
-        [FromQuery] int pagina = 1,
-        [FromQuery] int tamano = 20)
+    [HttpPost("{id:int}/restringir")]
+    public async Task<IActionResult> RestringirUsuario(int id, [FromBody] RestringirUsuarioRequest request)
     {
-        var result = await _adminService.ObtenerAuditoriaAsync(desde, hasta, pagina, tamano);
+        if (id != request.UsuarioId)
+            return BadRequest(new { error = "El ID en la ruta no coincide con el del cuerpo." });
+        try
+        {
+            await _adminService.RestringirUsuarioAsync(AdminId, request);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:int}/habilitar")]
+    public async Task<IActionResult> HabilitarUsuario(int id, [FromBody] HabilitarUsuarioRequest request)
+    {
+        if (id != request.UsuarioId)
+            return BadRequest(new { error = "El ID en la ruta no coincide con el del cuerpo." });
+        try
+        {
+            await _adminService.HabilitarUsuarioAsync(AdminId, request);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("auditoria")]
+    public async Task<IActionResult> ObtenerAuditoria([FromQuery] FiltroAuditoriaRequest filtro)
+    {
+        var result = await _adminService.ObtenerAuditoriaAsync(filtro);
         return Ok(result);
     }
 }
